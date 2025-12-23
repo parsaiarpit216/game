@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><link rel="icon" type="image/webp" href="logo.webp">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speed Symbol Match Pro</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --success: #00d2d3;
+            --danger: #ff6b6b;
+            --dark: #2d3436;
+            --bg: #a29bfe;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: var(--bg);
+            overflow: hidden;
+        }
+
+        .game-card {
+            background: rgb(230, 161, 230);
+            padding: 2.5rem;
+            border-radius: 30px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2);
+            width: 360px;
+            text-align: center;
+            position: relative;
+        }
+
+        h1 { color: var(--primary); margin: 0 0 10px 0; font-size: 1.8rem; }
+        .instruction { color: #636e72; font-size: 0.9rem; margin-bottom: 20px; }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: #f1f2f6;
+            padding: 10px 20px;
+            border-radius: 15px;
+            font-weight: bold;
+        }
+
+        /* The Main Display Area */
+        #display-container {
+            position: relative;
+            height: 160px;
+            margin-bottom: 30px;
+        }
+
+        #symbol-display {
+            font-size: 6rem;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            border: 5px solid var(--primary);
+            border-radius: 20px;
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Feedback Overlays */
+        .feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 5rem;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 18px;
+            font-size: 1.1rem;
+            font-weight: 800;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.1s, filter 0.2s;
+            color: white;
+        }
+
+        #no-btn { background: var(--danger); box-shadow: 0 6px 0 #cf6a87; }
+        #yes-btn { background: var(--success); box-shadow: 0 6px 0 #01a3a4; }
+        #start-btn { 
+            background: var(--primary); 
+            grid-column: span 2; 
+            margin-top: 10px;
+            box-shadow: 0 6px 0 #5f27cd;
+        }
+
+        .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 transparent; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        /* Animations */
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes feedbackAnim {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.4); opacity: 1; }
+            100% { transform: translate(-50%, -80%) scale(1); opacity: 0; }
+        }
+
+        .animate-pop { animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .show-feedback { animation: feedbackAnim 0.5s ease-out forwards; }
+        
+        .border-correct { border-color: var(--success) !important; }
+        .border-wrong { border-color: var(--danger) !important; }
+    </style>
+</head>
+<body>
+
+<div class="game-card">
+    <h1>Speed Match</h1>
+    <p class="instruction">Does it match the <b>previous</b> symbol?</p>
+    
+    <div class="stats">
+        <div class="stat-box">Score: <span id="score" style="color:var(--primary)">0</span></div>
+        <div class="stat-box">Time: <span id="timer" style="color:var(--danger)">30</span>s</div>
+    </div>
+    
+    <div id="display-container">
+        <div id="symbol-display">?</div>
+        <div id="feedback-correct" class="feedback">✅</div>
+        <div id="feedback-wrong" class="feedback">❌</div>
+    </div>
+    
+    <div class="controls">
+        <button id="no-btn" class="btn" disabled>NO</button>
+        <button id="yes-btn" class="btn" disabled>YES</button>
+        <button id="start-btn" class="btn">START GAME</button>
+    </div>
+</div>
+
+<script>
+    const symbols = ['🌈', '☀️', '🐱', '🍕', '🚀', '💎', '🎨', '⚽'];
+    let history = [];
+    let score = 0;
+    let timeLeft = 30;
+    let gameActive = false;
+    let timerInterval;
+
+    const display = document.getElementById('symbol-display');
+    const scoreText = document.getElementById('score');
+    const timerText = document.getElementById('timer');
+    const startBtn = document.getElementById('start-btn');
+    const yesBtn = document.getElementById('yes-btn');
+    const noBtn = document.getElementById('no-btn');
+    const correctFX = document.getElementById('feedback-correct');
+    const wrongFX = document.getElementById('feedback-wrong');
+
+    function startGame() {
+        score = 0;
+        timeLeft = 30;
+        history = [];
+        gameActive = true;
+        
+        scoreText.innerText = score;
+        timerText.innerText = timeLeft;
+        startBtn.style.display = 'none';
+        yesBtn.disabled = false;
+        noBtn.disabled = false;
+
+        spawnNext();
+        
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerText.innerText = timeLeft;
+            if (timeLeft <= 0) endGame();
+        }, 1000);
+    }
+
+    function spawnNext() {
+        const next = symbols[Math.floor(Math.random() * symbols.length)];
+        history.push(next);
+        
+        display.innerText = next;
+        display.classList.remove('animate-pop', 'border-correct', 'border-wrong');
+        void display.offsetWidth; 
+        display.classList.add('animate-pop');
+    }
+
+    function checkAnswer(userSaysMatch) {
+        if (!gameActive || history.length < 2) {
+            spawnNext();
+            return;
+        }
+
+        const current = history[history.length - 1];
+        const previous = history[history.length - 2];
+        const actuallyMatches = (current === previous);
+
+        if (userSaysMatch === actuallyMatches) {
+            score++;
+            scoreText.innerText = score;
+            showFeedback(correctFX, 'border-correct');
+        } else {
+            showFeedback(wrongFX, 'border-wrong');
+            timeLeft = Math.max(0, timeLeft - 2);
+            timerText.innerText = timeLeft;
+        }
+
+        spawnNext();
+    }
+
+    function showFeedback(element, borderClass) {
+        // Reset animations
+        correctFX.classList.remove('show-feedback');
+        wrongFX.classList.remove('show-feedback');
+        display.classList.remove('border-correct', 'border-wrong');
+        
+        void element.offsetWidth; 
+        element.classList.add('show-feedback');
+        display.classList.add(borderClass);
+    }
+
+    function endGame() {
+        gameActive = false;
+        clearInterval(timerInterval);
+        display.innerText = "🏁";
+        alert(`Finished! Score: ${score}`);
+        startBtn.style.display = 'block';
+        startBtn.innerText = 'PLAY AGAIN';
+        yesBtn.disabled = true;
+        noBtn.disabled = true;
+    }
+
+    startBtn.addEventListener('click', startGame);
+    yesBtn.addEventListener('click', () => checkAnswer(true));
+    noBtn.addEventListener('click', () => checkAnswer(false));
+
+    // Support for arrow keys
+    document.addEventListener('keydown', (e) => {
+        if (!gameActive) return;
+        if (e.key === "ArrowLeft") checkAnswer(false);
+        if (e.key === "ArrowRight") checkAnswer(true);
+    });
+</script>
+
+</body>
+</html>
